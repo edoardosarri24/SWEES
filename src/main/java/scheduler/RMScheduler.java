@@ -21,7 +21,7 @@ public final class RMScheduler {
 
     private TaskSet taskSet;
     private PriorityCeilingProtocol resProtocol;
-    private List<Task> blockedTask = new LinkedList<>();;
+    private List<Task> blockedTask = new LinkedList<>();
     private static final Logger logger = LoggingConfig.getLogger();
 
     // CONSTRUCTOR
@@ -51,51 +51,19 @@ public final class RMScheduler {
 
     // METHOD
     public void schedule() throws DeadlineMissedException {
-        // structures
-        TreeSet<Task> orderedTasks = new TreeSet<>(Comparator.comparingInt(Task::getDinamicPriority));
-        this.taskSet.getTasks().forEach(orderedTasks::add);
-        List<Duration> periods = orderedTasks.stream()
-            .map(Task::getPeriod)
-            .collect(Collectors.toList());
-        List<Duration> events = Multiple.generateMultiplesUpToLCM(periods);
-        Duration currentTime = Duration.ZERO;
-
-        // execution
-        while (!events.isEmpty()) {
+        Context context = new Context(this.taskSet);
+        while (!context.eventsIsFinished()) {
             // prossimo evento dove fare i controllli
-            Duration nextEvent = events.removeFirst();
-            Duration availableTime = nextEvent.minus(currentTime);
+            Duration nextEvent = context.getNextEvent();
+            Duration availableTime = context.calculateAvailableTime(nextEvent);
             logger.info("- Il tempo disponibile è: " + availableTime);
 
-            while (availableTime.isPositive()) {
-                if (orderedTasks.isEmpty()) {
-                    availableTime = Duration.ZERO;
-                } else {
-                    // prendo il task a priorità più alta
-                    Task currentTask = orderedTasks.pollFirst();
-                    // lo eseguo per al più il tempo rimanente
-                    Duration executedTime = currentTask.execute(availableTime, orderedTasks, this);
-                    // aggiorno il tempo rimanente
-                    availableTime = availableTime.minus(executedTime);
-                    // se il task non è finito lo rimetto in coda
-                    if (!currentTask.getIsExecuted() && !this.blockedTask.contains(currentTask))
-                        orderedTasks.add(currentTask);
-                }
-            }
+            // eseguo per al più il tempo a disposzione
+            this.executeTasksForMaxAvailableTime(context, availableTime);
 
             // per ogni task il cui periodo è scaduto controllo se ha superato la deadline
-            currentTime = nextEvent;
-            for (Task task : this.taskSet.getTasks()) {
-                if (currentTime.toMillis() % task.getPeriod().toMillis() == 0) {
-                    logger.info("- Al tempo "  + currentTime + " il task controllato e resettato: " + task.getId());
-                    task.checkAndReset();
-                    orderedTasks.add(task);
-                    logger.info("I task nella coda sono: " + 
-                        orderedTasks.stream()
-                            .map(Task::getId)
-                            .collect(Collectors.toList()));
-                }
-            }
+            context.setCurrentTime(nextEvent);
+            this.checkDeadlinesAndResetTasks(context, this.taskSet);
         }
         logger.info("La generazione di tracce è avvenuta con successo!");
     }
@@ -112,6 +80,78 @@ public final class RMScheduler {
                 task.setDinamicPriority(priority);
                 task.setNominalPriority(priority);
             });
+    }
+
+    private void executeTasksForMaxAvailableTime(Context context, Duration availableTime) {
+        Duration executedTime;
+        while (availableTime.isPositive() && !context.noTasksToExecute()) {
+            Task currentTask = context.getHighestPriorityTask();
+            executedTime = currentTask.execute(availableTime, context.getOrderedTasks(), this);
+            availableTime = availableTime.minus(executedTime);
+            if (!currentTask.getIsExecuted() && !this.blockedTask.contains(currentTask))
+                context.addIncompleteTasks(currentTask);
+        }
+    }
+
+    private void checkDeadlinesAndResetTasks(Context context, TaskSet taskSet) throws DeadlineMissedException {
+        for (Task task : this.taskSet.getTasks()) {
+            if (context.isPeriodElapsed(task)) {
+                logger.info("- Al tempo " + context.getCurrentTime() + " il task controllato e resettato: " + task.getId());
+                task.checkAndReset();
+                context.addIncompleteTasks(task);
+                logger.info("I task nella coda sono: " + 
+                    context.getOrderedTasks().stream()
+                        .map(Task::getId)
+                        .collect(Collectors.toList()));
+            }
+        }
+    }
+
+    private static class Context {
+
+        final TreeSet<Task> orderedTasks;
+        final List<Duration> events;
+        Duration currentTime = Duration.ZERO;
+        
+        Context(TaskSet taskSet) {
+            this.orderedTasks = new TreeSet<>(Comparator.comparingInt(Task::getDinamicPriority));
+            taskSet.getTasks().forEach(orderedTasks::add);
+            List<Duration> periods = this.orderedTasks.stream()
+                .map(Task::getPeriod)
+                .collect(Collectors.toList());
+            this.events = new LinkedList<>(Multiple.generateMultiplesUpToLCM(periods));
+        }
+    
+        boolean eventsIsFinished() {
+            return this.events.isEmpty();
+        }
+        Duration getNextEvent() {
+            return this.events.removeFirst();
+        }
+        Duration calculateAvailableTime(Duration nextEvent) {
+            return nextEvent.minus(this.currentTime);
+        }
+        boolean noTasksToExecute() {
+            return this.orderedTasks.isEmpty();
+        }
+        Task getHighestPriorityTask() {
+            return this.orderedTasks.pollFirst();
+        }
+        TreeSet<Task> getOrderedTasks() {
+            return this.orderedTasks;
+        }
+        void addIncompleteTasks(Task task) {
+            this.orderedTasks.add(task);
+        }
+        void setCurrentTime(Duration time) {
+            this.currentTime = time;
+        }
+        boolean isPeriodElapsed(Task task) {
+            return this.currentTime.toMillis() % task.getPeriod().toMillis() == 0;
+        }
+        Duration getCurrentTime() {
+            return this.currentTime;
+        }
     }
 
 }

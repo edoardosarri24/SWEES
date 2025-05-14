@@ -3,13 +3,17 @@ package scheduler;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
+import java.util.TreeSet;
+
 import org.junit.Before;
 import org.junit.Test;
 import helper.ReflectionUtils;
-import static org.assertj.core.api.Assertions.*;
 import taskSet.Chunk;
 import taskSet.Task;
 import taskSet.TaskSet;
+
+
+import static org.assertj.core.api.Assertions.*;
 
 public class RMSchedulerTest {
 
@@ -66,5 +70,39 @@ public class RMSchedulerTest {
             .isEqualTo((int) ReflectionUtils.getField(task2, "dinamicPriority"))
             .isEqualTo(9);
     }
-    
+
+
+    @SuppressWarnings("unchecked")
+    @Test
+    public void contextConstructor() {
+        Task task0 = new Task(
+            Duration.ofSeconds(10),
+            Duration.ofSeconds(10),
+            List.of(this.chunk));
+        Task task1 = new Task(
+            Duration.ofSeconds(5),
+            Duration.ofSeconds(5),
+            List.of(this.chunk));
+        Task task2 = new Task(
+            Duration.ofSeconds(15),
+            Duration.ofSeconds(15),
+            List.of(this.chunk));
+        TaskSet taskSet = new TaskSet(Set.of(task0, task1, task2));
+        new RMScheduler(taskSet);
+        Object context = ReflectionUtils.createContextInstance(taskSet);
+        Object orderedTasks = ReflectionUtils.getField(context, "orderedTasks");
+        assertThat((TreeSet<Task>) orderedTasks)
+            .containsExactly(task1, task0, task2);
+    }
+
+    @Test
+    public void executeTasksForMaxAvailableTime() {
+
+    }
+
+    @Test
+    public void checkDeadlinesAndResetTasks() {
+        
+    }
+
 }

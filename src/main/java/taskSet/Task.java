@@ -126,4 +126,19 @@ public final class Task {
                 "Il task " + this.id + " non è puramente periocico: ha periodo " + this.period + " e deadline " + this.deadline);
     }
 
+    @Override
+    public boolean equals(Object other) {
+        if (this == other)
+            return true;
+        if (other == null || getClass() != other.getClass())
+            return false;
+        Task task = (Task) other;
+        return this.id == task.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Integer.hashCode(id);
+    }
+
 }

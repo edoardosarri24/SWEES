@@ -1,6 +1,10 @@
 package helper;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import taskSet.TaskSet;
 
 public class ReflectionUtils {
     
@@ -54,6 +58,39 @@ public class ReflectionUtils {
             method.invoke(target);
         } catch (Exception e) {
             throw new RuntimeException("Errore nell'invocazione del metodo " + methodName, e);
+        }
+    }
+
+    /**
+     * Invokes a argument method with the specified name on the given target object using reflection.
+     *
+     * @param target the object on which to invoke the method
+     * @param methodName the name of the method to invoke
+     * @param params the parameters to pass to the method
+     * @throws RuntimeException if the method cannot be found or invoked
+     */
+    public static Object invokeMethod(Object target, String methodName, Object... params) {
+        try {
+            Class<?>[] paramTypes = Arrays.stream(params)
+                .map(Object::getClass)
+                .toArray(Class<?>[]::new);
+            
+            Method method = target.getClass().getDeclaredMethod(methodName, paramTypes);
+            method.setAccessible(true);
+            return method.invoke(target, params);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to invoke method " + methodName, e);
+        }
+    }
+
+    public static Object createContextInstance(TaskSet taskSet) {
+        try {
+            Class<?> contextClass = Class.forName("scheduler.RMScheduler$Context");
+            Constructor<?> constructor = contextClass.getDeclaredConstructor(TaskSet.class);
+            constructor.setAccessible(true);
+            return constructor.newInstance(taskSet);
+        } catch (Exception e) {
+            throw new RuntimeException("Impossibile creare l'istanza di Context via reflection", e);
         }
     }
 
