@@ -33,7 +33,7 @@ public final class PriorityCeilingProtocol {
     }
 
     // METHOD
-    public boolean access (Task task, RMScheduler scheduler, Chunk chunk) {
+    public boolean access(Task task, RMScheduler scheduler, Chunk chunk) {
         int maxCeiling = this.busyResources.stream()
             .filter(res -> !task.getResourcesAcquired().contains(res))
             .mapToInt(res -> this.ceiling.get(res))

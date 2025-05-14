@@ -72,7 +72,7 @@ public final class RMScheduler {
 
             // per ogni task il cui periodo è scaduto controllo se ha superato la deadline
             currentTime = nextEvent;
-            this.checkDeadlinesAndResetTasks(orderedTasks, currentTime, this.taskSet);
+            this.checkDeadlinesAndResetTasks(orderedTasks, currentTime);
         }
         logger.info("La generazione di tracce è avvenuta con successo!");
     }
@@ -102,7 +102,7 @@ public final class RMScheduler {
         }
     }
 
-    private void checkDeadlinesAndResetTasks(TreeSet<Task> orderedTasks, Duration currentTime, TaskSet taskSet) throws DeadlineMissedException {
+    private void checkDeadlinesAndResetTasks(TreeSet<Task> orderedTasks, Duration currentTime) throws DeadlineMissedException {
         for (Task task : this.taskSet.getTasks()) {
             if (currentTime.toMillis() % task.getPeriod().toMillis() == 0) {
                 logger.info("- Al tempo " + currentTime + " il task controllato e resettato: " + task.getId());
